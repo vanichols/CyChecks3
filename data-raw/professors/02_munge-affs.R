@@ -1,4 +1,4 @@
-# Merge salaries and affiliations based on a key constructed from the 
+# Merge salaries and affiliations based on a key constructed from the
 # last_name first_name middle_initial; use fuzzy join to account for missing middle initials
 
 library(dplyr) # for %>%
@@ -6,10 +6,10 @@ library(readr)
 
 
 clean_punc <- function(x) {
-  stringr::str_replace_all(x, "\\'", "") %>% 
-    stringr::str_replace_all("\\.", " ") %>% 
-    stringr::str_replace_all("[^[:alnum:]]", " ") %>% 
-    stringr::str_trim(.) %>% 
+  stringr::str_replace_all(x, "\\'", "") %>%
+    stringr::str_replace_all("\\.", " ") %>%
+    stringr::str_replace_all("[^[:alnum:]]", " ") %>%
+    stringr::str_trim(.) %>%
     stringr::str_squish(.)
 }
 
@@ -30,7 +30,7 @@ aff0 <-
   affiliation %>%
   mutate(
     dept_short_name = stringr::str_remove_all(dept_short_name, patterns)
-    ) %>% 
+    ) %>%
   filter(grepl("college", org_short_name))
 
 
@@ -42,11 +42,11 @@ aff1 <-
   dplyr::mutate(
     last_name = clean_punc(last_name),
     mid_name = clean_punc(mid_name),
-    first_name = clean_punc(first_name)) 
+    first_name = clean_punc(first_name))
 
 #--fix middle initials (make aff match sals) when I know they are problems
-aff2 <- 
-  aff1 %>% 
+aff2 <-
+  aff1 %>%
   mutate(
     first_name = case_when(
       grepl("sternberg", last_name) ~ "henrik",
@@ -69,43 +69,43 @@ aff2 <-
       grepl("stevens", last_name) & grepl("julie", first_name) ~ "l",
       grepl("stevenson", last_name) & grepl("gregory", first_name) ~ "w",
       grepl("taylor", last_name) & grepl("gary", first_name) ~ "d",
-      grepl("anderson", last_name) & grepl("e", first_name) 
+      grepl("anderson", last_name) & grepl("e", first_name)
       & dept1 == 4140 ~ "walter",
       grepl("windus", last_name) & grepl("theresa", first_name) ~ "l",
       TRUE ~ mid_name)
-  ) 
+  )
 
 # create what might look like the salary names
-aff3 <- 
-  aff2 %>% 
+aff3 <-
+  aff2 %>%
   dplyr::mutate(
     name_lf = paste(last_name, first_name, sep = " "),
     name_lfm = ifelse(is.na(mid_name), name_lf, paste(name_lf, mid_name, sep = " ")),
     name_lfm = clean_punc(name_lfm),
     name_lfm20 = stringr::str_sub(name_lfm, start = 1, end = 20),
-    ) %>% 
+    ) %>%
   select(-name_lf, -name_lfm)
 
-aff3 %>% 
+aff3 %>%
   filter(grepl("zhang hongwei", name_lfm20))
 
 # 4-X fix people in 2019 ------------------------------------------------------
 
-# some people have affs 2012-2018 but not 2019. 
-# aff_na19 <- read_csv("data-raw/professors/aff19-nas.csv") %>% 
+# some people have affs 2012-2018 but not 2019.
+# aff_na19 <- read_csv("data-raw/professors/aff19-nas.csv") %>%
 #   pull(sal_lfm20)
-# 
+#
 # #--these people are nas in 2019, but exist in 2018
-# aff_here18 <- 
-#   aff4 %>% 
+# aff_here18 <-
+#   aff4 %>%
 #   filter(year == 2018) %>%
-#   filter(name_lfm20 %in% aff_na19) %>% 
+#   filter(name_lfm20 %in% aff_na19) %>%
 #   pull(name_lfm20)
-# 
-# aff_here19 <- 
-#   aff4 %>% 
+#
+# aff_here19 <-
+#   aff4 %>%
 #   filter(year == 2019) %>%
-#   filter(name_lfm20 %in% aff_na19) %>% 
+#   filter(name_lfm20 %in% aff_na19) %>%
 #   pull(name_lfm20)
 
 #--check, but these could be copy-pasted from 2018?
@@ -113,47 +113,47 @@ aff3 %>%
 #--write it so if the nas change, I still have this happening for hard coded peeps
 #copythese <- setdiff(aff_here18, aff_here19)
 #tibble(here18 = copythese) %>% write_csv("data-raw/professors/aff19-nas-here18.csv")
-# aff4 %>% 
+# aff4 %>%
 #   filter(year == 2018|2019) %>%
-#   filter(name_lfm20 %in% copythese[16]) 
+#   filter(name_lfm20 %in% copythese[16])
 
 copythese <- read_csv("data-raw/professors/aff19-nas-here18.csv") %>% pull(here18)
 
-aff_replace19 <- 
-  aff3 %>% 
-  filter(year == 2018) %>% 
-  filter(name_lfm20 %in% copythese) %>% 
+aff_replace19 <-
+  aff3 %>%
+  filter(year == 2018) %>%
+  filter(name_lfm20 %in% copythese) %>%
   mutate(year = 2019)
 
 #--laura has aff data 2012-2015, but salary data from 2012-2019.
 #--kristen has aff data up to 2017
-aff_smar <- 
-  aff3 %>% 
-  filter(year == 2015) %>% 
+aff_smar <-
+  aff3 %>%
+  filter(year == 2015) %>%
   filter(grepl("smarandescu laura", name_lfm20)) %>%
-  select(-year) %>% 
+  select(-year) %>%
   tidyr::crossing(year = c(2016, 2017, 2018, 2019))
 
-aff_constant <- 
-  aff3 %>% 
-  filter(year == 2015) %>% 
+aff_constant <-
+  aff3 %>%
+  filter(year == 2015) %>%
   filter(grepl("constant kristen p", name_lfm20)) %>%
-  select(-year) %>% 
+  select(-year) %>%
   tidyr::crossing(year = c(2018, 2019))
 
-aff_crum <- 
-  aff3 %>% 
-  filter(year == 2014) %>% 
+aff_crum <-
+  aff3 %>%
+  filter(year == 2014) %>%
   filter(grepl("crum michael robert", name_lfm20)) %>%
-  select(-year) %>% 
+  select(-year) %>%
   tidyr::crossing(year = c(2015, 2016, 2017, 2018, 2019))
 
 
-aff4 <- 
-  aff3 %>% 
-  bind_rows(aff_replace19) %>% 
-  bind_rows(aff_smar) %>% 
-  bind_rows(aff_constant) %>% 
+aff4 <-
+  aff3 %>%
+  bind_rows(aff_replace19) %>%
+  bind_rows(aff_smar) %>%
+  bind_rows(aff_constant) %>%
   bind_rows(aff_crum)
 
 
@@ -161,21 +161,21 @@ aff4 <-
 # aff_na19 <- read_csv("data-raw/professors/aff19-nas.csv") %>%
 #   pull(sal_lfm20)
 
-# 
+#
 # setdiff(aff_na19, copythese)
-# qs <- tibble(qs = setdiff(aff_na19, copythese)) %>% 
+# qs <- tibble(qs = setdiff(aff_na19, copythese)) %>%
 #   tidyr::separate(qs, into = c("last", "first", "mid"))
 # qs
-# 
+#
 data("affiliation")
 affiliation %>%
   filter(grepl("bender", last_name)) %>%
   filter(grepl("holly", first_name))
-# 
+#
 #sals <- read_csv("data-raw/professors/sals-profs.csv")
 
 # sals %>%
-#   filter(grepl("oneal", name_lfm20)) %>% 
+#   filter(grepl("oneal", name_lfm20)) %>%
 #   select(year, name_lfm20)
 
 #--arcand
@@ -187,13 +187,13 @@ aff5 <- aff4
 # 6 center reassignments ------------------------------------------------
 
 #--only one prof in cds, google says this guy is in psychology
-professors %>% 
-  filter(grepl("lbrl art/sc cds", dept)) %>% 
+professors %>%
+  filter(grepl("lbrl art/sc cds", dept)) %>%
   select(year, college, dept, gender, name, title, dept_chair, base_salary)
 
 
-aff6  <- 
-  aff5 %>% 
+aff6  <-
+  aff5 %>%
   mutate(
     dept_short_name = case_when(
       grepl("goggi alcira susana", name_lfm20) ~ "agronomy",
@@ -204,16 +204,16 @@ aff6  <-
       grepl("kedrowski karen m", name_lfm20) ~ "political sc",
       grepl("venkatagiri horabail", name_lfm20) ~ "psychology",
       TRUE ~ dept_short_name)
-    ) %>% 
+    ) %>%
   mutate(
     org_short_name = case_when(
     grepl("kirschenmann frederi", name_lfm20) ~ "college of liberal arts & sciences",
     grepl("johnson lawrence", name_lfm20) ~ "college of human sciences",
     TRUE ~ org_short_name)
-  ) 
+  )
 
 
-  
+
 # 7 manual clean up ---------------------------------------------------------
 # elim david peterson in DEPT1 12170, prob a typo as it has no dept assigned
 # li wang in eeob is a post-doc (why included in affs ?!)
@@ -225,32 +225,32 @@ aff6  <-
 # we know prashant jha is agronomy, was hired 2019 but has no affil
 
 aff7 <-
-  aff6 %>% 
-  mutate(dept_short_name = ifelse(dept1 == 7090, 
+  aff6 %>%
+  mutate(dept_short_name = ifelse(dept1 == 7090,
                                   "art/visual cult",
                                   dept_short_name),
-         org_short_name = ifelse(dept1 == 7090, 
+         org_short_name = ifelse(dept1 == 7090,
                                  "college of design",
-                                 org_short_name)) %>% 
-  filter(!(stringr::str_detect("peterson david", name_lfm20) & 
-             dept1 == 12170)) %>% 
-  filter(!(last_name == "johnson" & 
-             first_name == "duane" & 
-             org_short_name == "college of business")) %>% 
-  filter(!(last_name == "wang" & 
-             first_name == "li" & 
-             dept_short_name == "eeob")) %>% 
-  filter(!(last_name == "wang" & 
-             first_name == "qian" & 
-             dept_short_name == "physics/astron")) %>% 
-  filter(!(last_name == "wang" & 
-             first_name == "qian" & 
-             dept_short_name == "food sc/hn-hsci")) %>% 
-  filter(!(last_name == "zhang" & 
-             first_name == "hongwei" & 
-             dept_short_name == "agronomy")) %>% 
+                                 org_short_name)) %>%
+  filter(!(stringr::str_detect("peterson david", name_lfm20) &
+             dept1 == 12170)) %>%
+  filter(!(last_name == "johnson" &
+             first_name == "duane" &
+             org_short_name == "college of business")) %>%
+  filter(!(last_name == "wang" &
+             first_name == "li" &
+             dept_short_name == "eeob")) %>%
+  filter(!(last_name == "wang" &
+             first_name == "qian" &
+             dept_short_name == "physics/astron")) %>%
+  filter(!(last_name == "wang" &
+             first_name == "qian" &
+             dept_short_name == "food sc/hn-hsci")) %>%
+  filter(!(last_name == "zhang" &
+             first_name == "hongwei" &
+             dept_short_name == "agronomy")) %>%
   dplyr::add_row(
-    year = 2019, 
+    year = 2019,
     dept1 = 1150,
     org_short_name = "college of agriculture & life sciences",
     dept_short_name = "agronomy",
@@ -263,5 +263,5 @@ aff7 <-
 
 # write it ----------------------------------------------------------------
 
-write_csv(aff7, "data-raw/professors/munged-affs.csv")
+write_csv(aff7, "data-raw/professors/02_munged-affs.csv")
 

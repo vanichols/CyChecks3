@@ -71,6 +71,9 @@ anova(fm1, fm2) # idk this suggests that we don't need random slope
 # male professors and awarded profs make more than females?
 exp(fixef(fm2)) %>% tidy()
 
+
+
+
 #--3-way w/dept fixed
 fm3 <- lm(lsal ~ title_simp * gender * dept, data = bsal)
 
@@ -164,8 +167,10 @@ m1 <- brm(
 summary(m1)
 
 #--yeah it looks terrible
+#--the std of dept_intercept also looks bad
 plot(m1)
-
+pairs(m1)
+pairs(m1, "^b_")
 #--would more iterations help?
 
 m1 <- brm(
