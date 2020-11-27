@@ -7,17 +7,20 @@ library(ggplot2)
 library(scales)
 library(stringr)
 
+
+theme_set(theme_bw())
+
 data("professors")
 
 profs <- professors %>% as_tibble()
 
 #--who makes $0-50000? Get rid of them for now.
 #--log makes gender effect a ratio
-bsal <- profs %>% 
-  filter(dept_chair == "N") %>% 
-  select(college, dept, gender, title_simp, base_salary, base50) %>% 
+bsal <- profs %>%
+  filter(dept_chair == "N") %>%
+  select(college, dept, gender, title_simp, base_salary, base50) %>%
   filter(base50 == "Y") %>%
-  mutate_if(is.character, str_to_title) %>% 
+  mutate_if(is.character, str_to_title) %>%
   mutate(lsal = log(base_salary),
          title_simp = factor(title_simp, levels = c("Asst Prof", "Assoc Prof", "Prof", "Awarded Prof")))
 
@@ -26,24 +29,24 @@ bsal <- profs %>%
 
 
 #--look at it
-bsal %>% 
-  ggplot(aes(gender, base_salary, color = gender)) + 
+bsal %>%
+  ggplot(aes(gender, base_salary, color = gender)) +
   geom_boxplot(outlier.colour = NA) +
-  geom_jitter(alpha = 0.4) + 
+  geom_jitter(alpha = 0.4) +
   facet_grid(title_simp ~ .) +
-  scale_y_continuous(labels = dollar_format()) + 
+  scale_y_continuous(labels = dollar_format()) +
   guides(color = F) +
-  coord_flip() + 
+  coord_flip() +
   labs(title = "2019 ISU Salaries",
        y = "Reported Base Salary",
-       x = NULL) + 
+       x = NULL) +
   theme_bw()
-  
+
 #--dang who makes more than $150thou as an asst
 #--oh. business.
-professors %>% 
+professors %>%
   filter(base_salary > 150000,
-         title_simp == "asst prof") %>% 
+         title_simp == "asst prof") %>%
   select(college, dept, gender, name, title)
 
 
@@ -53,20 +56,57 @@ library(lme4)
 library(lmerTest)
 library(emmeans)
 library(broom)
-
+library(janitor)
+library(tidyr)
+library(tidytext)
 
 # This works but complains
-fm1a <- lmerTest::lmer(lsal ~ title_simp * gender + (1 + gender|dept), data = bsal, REML = F)
+fm1 <- lmerTest::lmer(lsal ~ title_simp * gender + (1 + gender|dept), data = bsal, REML = F)
 
 # without random slope
-fm1d <- lmerTest::lmer(lsal ~ title_simp * gender + (1|dept), data = bsal, REML = F)
+fm2 <- lmerTest::lmer(lsal ~ title_simp * gender + (1|dept), data = bsal, REML = F)
 
-anova(fm1d, fm1a) # idk this suggests that we don't need random slope
+anova(fm1, fm2) # idk this suggests that we don't need random slope
 
 # male professors and awarded profs make more than females?
-exp(fixef(fm1d)) %>% tidy()
+exp(fixef(fm2)) %>% tidy()
+
+#--3-way w/dept fixed
+fm3 <- lm(lsal ~ title_simp * gender * dept, data = bsal)
+
+fm3_coefs <-
+  emmeans(fm3, specs = pairwise ~ title_simp:gender|dept, type = "response")$contrasts %>%
+    confint(level = 0.8) %>%
+    rbind() %>%
+    as_tibble()
+
+cystats <-
+  fm3_coefs %>%
+    separate(contrast, into = c("x1", "x2"), sep = "-") %>%
+    mutate_if(is.character, str_trim) %>%
+    mutate(x1prof = str_sub(x1, 1, -3),
+           x2prof = str_sub(x2, 1, -3)) %>%
+    filter(x1prof == x2prof) %>%
+  mutate_if(is.numeric, function(x) (x*-1)) %>%
+  mutate(SE = abs(SE)) %>%
+  filter(!is.na(estimate)) %>%
+  mutate(dept2 = reorder_within(dept, estimate, x1),
+         year = 2019) %>%
+  select(-x2prof) %>%
+  rename(title_simp = x1prof) %>%
+  select(year, title_simp, x1, x2, dept, dept2, everything())
 
 
+usethis::use_data(cystats, overwrite = T)
+
+cystats %>%
+  ggplot(aes(dept, estimate)) +
+  geom_hline(yintercept = 0) +
+  geom_linerange(aes(ymin = lower.CL, ymax = upper.CL), color = "gray60") +
+  geom_point(color = "red", aes(size = abs(estimate))) +
+  scale_x_reordered() +
+  facet_wrap(~x1prof, scales = "free") +
+  coord_flip()
 
 # bayesian ----------------------------------------------------------------
 
@@ -74,9 +114,9 @@ library(brms)
 library(tidybayes)
 library(forcats)
 
-bsal_brms <- 
-  bsal %>% 
-  select(-base50) %>% 
+bsal_brms <-
+  bsal %>%
+  select(-base50) %>%
   mutate_if(is.character, as.factor)
 
 options(mc.cores = parallel::detectCores())
@@ -85,22 +125,22 @@ options(mc.cores = parallel::detectCores())
 get_prior(
   lsal ~  gender * title_simp + gender + (1 | dept),
   data = bsal_brms
-  ) %>% 
+  ) %>%
   parse_dist(prior) %>% #--a tidybayes function
   ggplot(aes(y = prior, dist = .dist, args = .args, fill = class)) +
   stat_dist_halfeye() +
   theme(axis.text=element_text(size=15))
 
-#--test new ones
-p0 <- prior(student_t(3, 11.5, 2.5), class = "b",  coef = "default") + 
-  prior(student_t(3, 11.5, 2), class = "b", coef = "tighter") + 
+#--test new ones for intercept
+p0 <- prior(student_t(3, 11.5, 2.5), class = "b",  coef = "default") +
+  prior(student_t(3, 11.5, 2), class = "b", coef = "tighter") +
   prior(student_t(3, 11.5, 1), class = "b", coef = "even tighter") +
-  prior(student_t(2, 11.5, 1), class = "b", coef = "lower dof") + 
-  prior(student_t(6, 11.5, 1), class = "b", coef = "higher dog") 
+  prior(student_t(2, 11.5, 1), class = "b", coef = "lower dof") +
+  prior(student_t(6, 11.5, 1), class = "b", coef = "higher dog")
 
 
 
-p0 %>% 
+p0 %>%
   parse_dist(prior) %>% #--a tidybayes function
   ggplot(aes(y = prior, dist = .dist, args = .args, fill = coef)) + #--never would've figured this out
   stat_dist_halfeye() +
@@ -110,12 +150,12 @@ exp(10.5)
 exp(11.5)
 exp(12.5)
 
-#--I think the sd of 1 is reasonable. The right tail should probably be longer. 
+#--I think the sd of 1 is reasonable. The right tail should probably be longer.
 
 m1pr <- prior(student_t(6, 11.5, 1), class = "b")
-  
+
 m1 <- brm(
-  lsal ~  gender * title_simp + gender + (1 | dept),
+  lsal ~  gender * title_simp + (1 | dept),
   data = bsal_brms,
   sample_prior = T
 )
@@ -123,18 +163,29 @@ m1 <- brm(
 #--oof the intercept still had a hard time. I'll have to think about why that is
 summary(m1)
 
+#--yeah it looks terrible
+plot(m1)
+
+#--would more iterations help?
+
+m1 <- brm(
+  lsal ~  gender * title_simp + (1 | dept),
+  data = bsal_brms,
+  iter = 3000, warmup = 2000, chains = 4, #--inc iterations from 2000, inc warmup
+)
+
 #--look at the intercept
-#--should I restrict it to positive values? No one should make less than $1. 
+#--should I restrict it to positive values? No one should make less than $1.
 prior_samples(m1) %>%
-  as_tibble() %>% 
-  tidyr::pivot_longer(cols = Intercept:sd_dept) %>% 
+  as_tibble() %>%
+  tidyr::pivot_longer(cols = Intercept:sd_dept) %>%
   ggplot(aes(y = name, x = value)) +
   stat_halfeye()
 
 
 #--look at terms
-#--b_Intercept is female-assistprof. 
-#--the r_dept are offsets from the intercept for each dept. 
+#--b_Intercept is female-assistprof.
+#--the r_dept are offsets from the intercept for each dept.
 get_variables(m1)
 
 #--since we only had random intercept effects, just get it by dept
@@ -157,14 +208,14 @@ m1 %>%
   gather_draws(`b_.*`, regex = TRUE) %>%
   ungroup() %>%
   mutate(
-    .variable = str_remove_all(.variable, "b_|gender|title_simp")) %>% 
+    .variable = str_remove_all(.variable, "b_|gender|title_simp")) %>%
   dplyr::filter(.variable != "Intercept",
                 .variable != "Prof",
                 .variable != "AssocProf",
                 .variable != "AwardedProf") %>%
   mutate(
     .variable = ifelse(.variable == "M", "M:AsstProf", .variable),
-    .variable = fct_reorder(.variable, .value)) %>% 
+    .variable = fct_reorder(.variable, .value)) %>%
   ggplot(aes(x = .value, y = .variable)) +
   geom_vline(xintercept = 0, color = "gray50", size = 1.2, lty = 2, alpha = 0.5) +
   geom_halfeyeh(aes(fill = .variable)) +
@@ -173,6 +224,27 @@ m1 %>%
   labs(title = "The effect of being male")
 
 
+
+# dept as fixed -----------------------------------------------------------
+
+get_prior(
+  lsal ~  gender * title_simp * dept,
+  data = bsal_brms
+) %>%
+  parse_dist(prior) %>% #--a tidybayes function
+  ggplot(aes(y = prior, dist = .dist, args = .args, fill = class)) +
+  stat_dist_halfeye() +
+  theme(axis.text=element_text(size=15))
+
+
+# m2 <- brm(
+#   lsal ~  gender * title_simp * dept,
+#   data = bsal_brms,
+#   sample_prior = T
+# )
+
+#--oof the intercept still had a hard time. I'll have to think about why that is
+summary(m2)
 
 # try with 0 intercept ----------------------------------------------------
 
@@ -184,9 +256,9 @@ get_prior(
   data = bsal_brms
 )
 
-#--these priors are for asst profs. 
-p2 <- prior(student_t(3, 11.5, 2), class = "b", coef = "genderM") + 
-  prior(student_t(3, 11.5, 2), class = "b", coef = "genderF")  
+#--these priors are for asst profs.
+p2 <- prior(student_t(3, 11.5, 2), class = "b", coef = "genderM") +
+  prior(student_t(3, 11.5, 2), class = "b", coef = "genderF")
 
 m2 <- brm(
   lsal ~  0 + gender * title_simp + gender + (1 | dept),
@@ -201,36 +273,36 @@ summary(m2)
 #--I'm not sure how to interpret these results
 
 #--look at terms
-#--b_Intercept is female-assistprof. 
-#--the r_dept are offsets from the intercept for each dept. 
+#--b_Intercept is female-assistprof.
+#--the r_dept are offsets from the intercept for each dept.
 get_variables(m2)
 
 m2 %>%
   gather_draws(`b_.*`, regex = TRUE) %>%
   ungroup() %>%
   mutate(
-    .variable = str_remove_all(.variable, "b_|gender|title_simp")) %>% 
+    .variable = str_remove_all(.variable, "b_|gender|title_simp")) %>%
   dplyr::filter(.variable %in% c("F", "M")) %>%
   ggplot(aes(x = .value, y = .variable)) +
   geom_halfeyeh(fill = "gray80") +
   stat_pointintervalh(.width = c(.66, .95)) +
-  theme(legend.position = "none") 
+  theme(legend.position = "none")
 
 
 m2 %>%
   gather_draws(`b_.*`, regex = TRUE) %>%
   ungroup() %>%
   mutate(
-    .variable = str_remove_all(.variable, "b_|gender|title_simp")) %>% 
+    .variable = str_remove_all(.variable, "b_|gender|title_simp")) %>%
   dplyr::filter(.variable != "Intercept",
                 .variable != "Prof",
                 .variable != "AssocProf",
                 .variable != "AwardedProf") %>%
   mutate(
     .variable = ifelse(.variable == "M", "M:AsstProf", .variable),
-    .variable = fct_reorder(.variable, .value)) %>% 
+    .variable = fct_reorder(.variable, .value)) %>%
   ggplot(aes(x = .value, y = .variable)) +
   geom_vline(xintercept = 0, color = "gray50", size = 1.2, lty = 2, alpha = 0.5) +
   geom_halfeyeh(fill = "gray80") +
   stat_pointintervalh(.width = c(.66, .95)) +
-  theme(legend.position = "none") 
+  theme(legend.position = "none")
