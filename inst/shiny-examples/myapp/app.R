@@ -9,6 +9,7 @@ library(scales) #--to get $ on y axis, so easy!
 library(stringr)
 library(forcats)
 library(tidytext)
+#devtools::install_github("vanichols/CyChecks3")
 library(CyChecks3)
 
 
@@ -183,7 +184,7 @@ ui <- fluidPage(theme = shinytheme("united"),
                              ),
                              column(width = 9,
                                     plotlyOutput("fig_univ",
-                                               height = "800px", width = "1200px")))
+                                               height = "700px", width = "1200px")))
                            ),
                   #--end univ tab-
 
@@ -215,7 +216,7 @@ ui <- fluidPage(theme = shinytheme("united"),
                                downloadButton("downloadData_salsc", "Download")
                              ),
                              column(width = 9,
-                                    plotlyOutput("fig_salsc", height = "800px", width = "1200px"))
+                                    plotlyOutput("fig_salsc", height = "700px", width = "1200px"))
                            )),
                   #--end sals tab-
 
@@ -249,7 +250,7 @@ ui <- fluidPage(theme = shinytheme("united"),
                                downloadButton("downloadData_sals", "Download")
                              ),
                              column(width = 9,
-                                    plotlyOutput("fig_sals", height = "800px", width = "1200px"))
+                                    plotlyOutput("fig_sals", height = "700px", width = "1200px"))
                            )),
                   #--end sals tab-
 
@@ -274,7 +275,7 @@ ui <- fluidPage(theme = shinytheme("united"),
                                ),
                              column(width = 10,
                                     fluidRow(
-                                    plotlyOutput("fig_gend",  height = "1000px", width = '1300px')
+                                    plotlyOutput("fig_gend",  height = "900px", width = '1300px')
                                     )
                            ))
                   ),
@@ -301,7 +302,7 @@ ui <- fluidPage(theme = shinytheme("united"),
                              column(width = 8,
                                     offset = 2,
                                     fluidRow(
-                                      plotOutput("fig_stats",  height = "800px", width = '600px')
+                                      plotOutput("fig_stats",  height = "700px", width = '600px')
                                     )
                              ))
                   )
