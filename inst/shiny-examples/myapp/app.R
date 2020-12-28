@@ -122,6 +122,35 @@ prac_gend %>%
 
 
 
+prac_gend %>%
+  group_by(year, dept) %>%
+  summarise(Female = sum(Female, na.rm = T),
+            Male = sum(Male, na.rm = T)) %>%
+  mutate( tot = Female + Male,
+          fracM = Male/tot) %>%
+  arrange(fracM) %>%
+  mutate(dept = fct_inorder(dept)) %>%
+  ggplot(aes(dept, fracM,
+             group = 1,
+             text = paste("Total Faculty:", tot)
+  )) +
+  geom_segment(aes(x = dept, xend = dept, y = 0, yend = fracM)) +
+  geom_point(aes(size = tot), color = "red4") +
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  scale_y_continuous(labels = label_percent(), limits = c(0, 1)) +
+  mytheme +
+  theme(legend.position = "none") +
+  labs(y = "Male Faculty (% of Total)", x = NULL)
+
+prac_gend %>%
+  group_by(dept) %>%
+  summarise(n = n()) %>%
+  arrange(-n)
+
+prac_gend %>%
+  filter(dept == "Eeob")
+
+
 #plotbp <-
   sals %>%
   filter(salary_type != "travel_subsistence") %>%
@@ -495,9 +524,9 @@ server <- function(input, output) {
     sals %>%
       filter(
         year == input$sel_year_gend) %>%
-      select(year, college2, dept, gender, name, title, title_simp) %>%
+      select(year, dept, gender, name, title, title_simp) %>%
       distinct() %>%
-      group_by(year, college2, dept, gender) %>%
+      group_by(year, dept, gender) %>%
       summarise(n = n()) %>%
       ungroup() %>%
       pivot_wider(names_from = gender, values_from = n) %>%
@@ -509,9 +538,8 @@ server <- function(input, output) {
         dept = fct_reorder(dept, fracM)) %>%
       arrange(dept) %>%
       mutate(clr = ifelse(fracM > 0.5, "Male", "Female")) %>%
-        arrange(college2, fracM) %>%
-        mutate(dept = fct_inorder(dept),
-               college2 = str_remove_all(college2, "College Of "))
+        arrange(fracM) %>%
+        mutate(dept = fct_inorder(dept)))
 
     } else {
 
@@ -543,8 +571,7 @@ server <- function(input, output) {
 
     pgend <-
     liq_gend1() %>%
-      mutate(dept2 = reorder_within(dept, fracM, college2)) %>%
-      ggplot(aes(dept2, fracM,
+      ggplot(aes(dept, fracM,
                  group = 1,
                  text = paste("Total Faculty:", tot,
                               "<br>Dept:", dept,
@@ -556,12 +583,9 @@ server <- function(input, output) {
       geom_point(aes(size = tot, color = clr)) +
       scale_color_manual(values = c("Female" = femalecolor, "Male" = malecolor)) +
       scale_y_continuous(labels = label_percent(), limits = c(0, 1)) +
-      facet_wrap(~college2, scales = "free", nrow = 2) +
-        scale_x_reordered() +
-      coord_flip() +
       mytheme +
       theme(legend.position = "none",
-            axis.text.y = element_blank()) +
+            axis.text.x = element_blank()) +
       labs(y = "Male Faculty (% of Total)", x = NULL)
 
     ggplotly(pgend, tooltip = "text") %>% layout(margin = list(l = 160, b = 160))
