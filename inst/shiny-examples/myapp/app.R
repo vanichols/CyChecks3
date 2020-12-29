@@ -108,6 +108,7 @@ prac_gend <-
 prac_gend %>%
   arrange(college, fracM) %>%
   mutate(dept = fct_inorder(dept)) %>%
+  filter(college == "College Of Agriculture & Life Sciences") %>%
   ggplot(aes(dept, fracM,
          group = 1,
          text = paste("Total Faculty:", tot)
@@ -115,11 +116,10 @@ prac_gend %>%
   geom_segment(aes(x = dept, xend = dept, y = 0, yend = fracM)) +
   geom_point(aes(size = tot), color = "red4") +
   geom_hline(yintercept = 0.5, linetype = "dashed") +
-  facet_wrap(~college, scales = "free") +
   scale_y_continuous(labels = label_percent()) +
-  coord_flip() +
   mytheme +
-  theme(legend.position = "none") +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 45, hjust = 1)) +
   labs(y = "Male Faculty (% of Total)", x = NULL)
 
 
@@ -611,14 +611,14 @@ server <- function(input, output) {
                                    "Male" = malecolor)) +
       theme(legend.position = "none",
             axis.text.x = element_blank()) +
-      labs(y = "Male Faculty\n(% of Total)", x = "Department")
+      labs(y = "Male Faculty (% of Total)", x = "Department")
 
     ggplotly(pgend, tooltip = "text") %>% layout(margin = list(l = 160, b = 160))
 
     } else {
         pgend <-
           liq_gend1() %>%
-          mutate(dept = fct_rev(dept)) %>%
+          #mutate(dept = fct_rev(dept)) %>%
           ggplot(aes(dept, fracM,
                      group = 1,
                      text = paste("Total Faculty:", tot,
@@ -631,10 +631,10 @@ server <- function(input, output) {
           scale_fill_manual(values = c("Female" = femalecolor, "Male" = malecolor)) +
           scale_y_continuous(labels = label_percent(), limits = c(0, 1)) +
           facet_grid(.~college2, scales = "free") +
-          coord_flip() +
           mytheme +
-          theme(legend.position = "none") +
-          labs(y = "Male Faculty\n(% of Total)", x = NULL)
+          theme(legend.position = "none",
+                axis.text.x = element_text(angle = 45, hjust = 1)) +
+          labs(y = "Male Faculty (% of Total)", x = NULL)
 
         ggplotly(pgend, tooltip = "text") %>% layout(margin = list(l = 160))
 
