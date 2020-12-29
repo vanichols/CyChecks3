@@ -9,6 +9,7 @@ library(scales) #--to get $ on y axis, so easy!
 library(stringr)
 library(forcats)
 library(tidytext)
+library(markdown)
 #devtools::install_github("vanichols/CyChecks3")
 library(CyChecks3)
 
@@ -85,7 +86,7 @@ dd_saltype <-  sals %>% arrange(salary_type_nice) %>% pull(salary_type_nice) %>%
 dd_pos <-  sals %>% arrange(title_simp) %>% pull(title_simp) %>% unique() %>% as.character()
 
 
-#--practice graph
+###practice graph1----
 prac_gend <-
   sals %>%
 #  filter(college == dd_college[1]) %>%
@@ -103,6 +104,7 @@ prac_gend <-
     dept = fct_reorder(dept, fracM)) %>%
   arrange(dept)
 
+###practice graph2----
 prac_gend %>%
   arrange(college, fracM) %>%
   mutate(dept = fct_inorder(dept)) %>%
@@ -122,6 +124,7 @@ prac_gend %>%
 
 
 
+###practice graph3----
 prac_gend %>%
   group_by(year, dept) %>%
   summarise(Female = sum(Female, na.rm = T),
@@ -129,16 +132,20 @@ prac_gend %>%
   mutate( tot = Female + Male,
           fracM = Male/tot) %>%
   arrange(fracM) %>%
-  mutate(dept = fct_inorder(dept)) %>%
+  mutate(dept = fct_inorder(dept),
+         dept = fct_rev(dept)) %>%
   ggplot(aes(dept, fracM,
              group = 1,
              text = paste("Total Faculty:", tot)
   )) +
-  geom_segment(aes(x = dept, xend = dept, y = 0, yend = fracM)) +
-  geom_point(aes(size = tot), color = "red4") +
   geom_hline(yintercept = 0.5, linetype = "dashed") +
+  geom_segment(aes(x = dept, xend = dept, y = 0, yend = fracM)) +
+  geom_point(aes(size = tot, fill = fracM), pch = 21) +
   scale_y_continuous(labels = label_percent(), limits = c(0, 1)) +
   mytheme +
+  scale_fill_gradient2(low = femalecolor, mid = "white", high = malecolor,
+                          midpoint = 0.5) +
+  coord_flip() +
   theme(legend.position = "none") +
   labs(y = "Male Faculty (% of Total)", x = NULL)
 
@@ -192,6 +199,25 @@ ui <- fluidPage(theme = shinytheme("united"),
                   "CyChecks3 Professor Explorer",
 
                   #--start tab
+                  tabPanel("What is this?",
+                           column(
+                             3,
+                             #offset = 4,
+                             tags$img(
+                               src = "CyChecks_hexsticker.png",
+                               height = 300,
+                               width = 250,
+                               align = "center"
+                             )),
+                             column(9,
+                                    #offset = 1,
+                                  includeMarkdown("about.md"))
+
+                  ),
+                  #--end about tab-
+
+
+                    #--start tab
                   tabPanel("University Salaries by Gender",
                            fluidRow(
                              column(
@@ -304,7 +330,7 @@ ui <- fluidPage(theme = shinytheme("united"),
                                ),
                              column(width = 10,
                                     fluidRow(
-                                    plotlyOutput("fig_gend",  height = "900px", width = '1300px')
+                                    plotlyOutput("fig_gend",  height = "700px", width = '1000px')
                                     )
                            ))
                   ),
@@ -535,11 +561,9 @@ server <- function(input, output) {
         Male = ifelse(is.na(Male), 0, Male),
         tot = Female + Male,
         fracM = Male/tot,
-        dept = fct_reorder(dept, fracM)) %>%
-      arrange(dept) %>%
-      mutate(clr = ifelse(fracM > 0.5, "Male", "Female")) %>%
+        clr = ifelse(fracM > 0.5, "Male", "Female")) %>%
         arrange(fracM) %>%
-        mutate(dept = fct_inorder(dept)))
+        mutate(dept = fct_inorder(dept))
 
     } else {
 
@@ -579,20 +603,22 @@ server <- function(input, output) {
                               "<br>M:", Male))
       ) +
       geom_hline(yintercept = 0.5, linetype = "dashed") +
-      geom_segment(aes(x = dept2, xend = dept2, y = 0, yend = fracM)) +
-      geom_point(aes(size = tot, color = clr)) +
-      scale_color_manual(values = c("Female" = femalecolor, "Male" = malecolor)) +
+      geom_segment(aes(x = dept, xend = dept, y = 0, yend = fracM)) +
+      geom_point(aes(size = tot, fill = clr), pch = 21) +
       scale_y_continuous(labels = label_percent(), limits = c(0, 1)) +
       mytheme +
+      scale_fill_manual(values = c("Female" = femalecolor,
+                                   "Male" = malecolor)) +
       theme(legend.position = "none",
             axis.text.x = element_blank()) +
-      labs(y = "Male Faculty (% of Total)", x = NULL)
+      labs(y = "Male Faculty\n(% of Total)", x = "Department")
 
     ggplotly(pgend, tooltip = "text") %>% layout(margin = list(l = 160, b = 160))
 
     } else {
         pgend <-
           liq_gend1() %>%
+          mutate(dept = fct_rev(dept)) %>%
           ggplot(aes(dept, fracM,
                      group = 1,
                      text = paste("Total Faculty:", tot,
@@ -601,14 +627,14 @@ server <- function(input, output) {
           ) +
           geom_hline(yintercept = 0.5, linetype = "dashed") +
           geom_segment(aes(x = dept, xend = dept, y = 0, yend = fracM)) +
-          geom_point(aes(size = tot, color = clr)) +
-          scale_color_manual(values = c("Female" = femalecolor, "Male" = malecolor)) +
+          geom_point(aes(size = tot, fill = clr), pch = 21) +
+          scale_fill_manual(values = c("Female" = femalecolor, "Male" = malecolor)) +
           scale_y_continuous(labels = label_percent(), limits = c(0, 1)) +
           facet_grid(.~college2, scales = "free") +
           coord_flip() +
           mytheme +
           theme(legend.position = "none") +
-          labs(y = "Male Faculty (% of Total)", x = NULL)
+          labs(y = "Male Faculty\n(% of Total)", x = NULL)
 
         ggplotly(pgend, tooltip = "text") %>% layout(margin = list(l = 160))
 

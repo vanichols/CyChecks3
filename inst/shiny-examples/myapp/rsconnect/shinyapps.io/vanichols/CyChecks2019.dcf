@@ -5,8 +5,8 @@ account: vanichols
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 3319646
-bundleId: 3919875
+bundleId: 4037400
 url: https://vanichols.shinyapps.io/CyChecks2019/
-when: 1606677448.3356
+when: 1609213331.32532
 asMultiple: FALSE
 asStatic: FALSE
