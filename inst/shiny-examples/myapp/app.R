@@ -358,7 +358,7 @@ ui <- fluidPage(theme = shinytheme("united"),
                                  "sel_title_stats",
                                  label = ("Position:"),
                                  choices = dd_pos,
-                                 selected = dd_pos[1]),
+                                 selected = dd_pos[3]),
                              #--select year
                              selectInput(
                                "sel_year_stats",
@@ -520,7 +520,8 @@ server <- function(input, output) {
         fracM = Male/tot,
         clr = ifelse(fracM > 0.5, "Male", "Female")) %>%
         arrange(fracM) %>%
-        mutate(dept = fct_inorder(dept))
+        mutate(dept = fct_inorder(dept),
+               highlight = ifelse(dept == input$sel_dept_gend, "Y", "N"))
 
     } else {
 
@@ -541,7 +542,8 @@ server <- function(input, output) {
           fracM = Male/tot,
           dept = fct_reorder(dept, fracM)) %>%
         arrange(dept) %>%
-        mutate(clr = ifelse(fracM > 0.5, "Male", "Female"))
+        mutate(clr = ifelse(fracM > 0.5, "Male", "Female"),
+               highlight = ifelse(dept == input$sel_dept_gend, "Y", "N"))
       }
 
   })
@@ -562,6 +564,8 @@ server <- function(input, output) {
       geom_hline(yintercept = 0.5, linetype = "dashed") +
       geom_segment(aes(x = dept, xend = dept, y = 0, yend = fracM)) +
       geom_point(aes(size = tot, fill = clr), pch = 21) +
+      geom_point(data = . %>% filter(highlight == "Y"),
+                 aes(size = tot), fill = "red4", pch = 21) +
       scale_y_continuous(labels = label_percent(), limits = c(0, 1)) +
       mytheme +
       scale_fill_manual(values = c("Female" = femalecolor,
@@ -585,6 +589,8 @@ server <- function(input, output) {
           geom_hline(yintercept = 0.5, linetype = "dashed") +
           geom_segment(aes(x = dept, xend = dept, y = 0, yend = fracM)) +
           geom_point(aes(size = tot, fill = clr), pch = 21) +
+          geom_point(data = . %>% filter(highlight == "Y"),
+                     aes(size = tot), fill = "red4", pch = 21) +
           scale_fill_manual(values = c("Female" = femalecolor, "Male" = malecolor)) +
           scale_y_continuous(labels = label_percent(), limits = c(0, 1)) +
           facet_grid(.~college2, scales = "free") +
