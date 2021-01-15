@@ -218,7 +218,7 @@ ui <- fluidPage(theme = shinytheme("united"),
 
 
                     #--start tab
-                  tabPanel("University Salaries by Gender",
+                  tabPanel("University",
                            fluidRow(
                              column(
                                width = 3,
@@ -243,42 +243,44 @@ ui <- fluidPage(theme = shinytheme("united"),
                            ),
                   #--end univ tab-
 
+                  # #--start tab
+                  # tabPanel("Salaries by College",
+                  #          fluidRow(
+                  #            column(
+                  #              width = 3,
+                  #              #--input, select dept
+                  #              selectInput(
+                  #                "sel_college_salsc",
+                  #                label = ("College:"),
+                  #                choices = dd_college,
+                  #                selected = dd_college[6]),
+                  #              #--input, select salary type
+                  #              selectInput(
+                  #                "sel_saltype_salsc",
+                  #                label = ("Salary Type:"),
+                  #                choices = dd_saltype,
+                  #                selected = dd_saltype[1]),
+                  #
+                  #              #--input, select year
+                  #              selectInput(
+                  #                "sel_year_salsc",
+                  #                label = ("Year:"),
+                  #                choices = dd_year,
+                  #                selected = dd_year[1]),
+                  #              #--download data
+                  #              downloadButton("downloadData_salsc", "Download"),
+                  #              br(),
+                  #              h4("Red triangles are department heads")
+                  #              ),
+                  #            column(width = 9,
+                  #                   plotlyOutput("fig_salsc", height = "700px", width = "1200px"))
+                  #          )),
+                  # #--end sals tab-
+
+
+
                   #--start tab
-                  tabPanel("Salaries by College",
-                           fluidRow(
-                             column(
-                               width = 3,
-                               #--input, select dept
-                               selectInput(
-                                 "sel_college_salsc",
-                                 label = ("College:"),
-                                 choices = dd_college,
-                                 selected = dd_college[6]),
-                               #--input, select salary type
-                               selectInput(
-                                 "sel_saltype_salsc",
-                                 label = ("Salary Type:"),
-                                 choices = dd_saltype,
-                                 selected = dd_saltype[1]),
-
-                               #--input, select year
-                               selectInput(
-                                 "sel_year_salsc",
-                                 label = ("Year:"),
-                                 choices = dd_year,
-                                 selected = dd_year[1]),
-                               #--download data
-                               downloadButton("downloadData_salsc", "Download")
-                             ),
-                             column(width = 9,
-                                    plotlyOutput("fig_salsc", height = "700px", width = "1200px"))
-                           )),
-                  #--end sals tab-
-
-
-
-                  #--start tab
-                  tabPanel("Salaries by Department",
+                  tabPanel("Departments",
                            fluidRow(
                              column(
                                width = 3,
@@ -302,7 +304,9 @@ ui <- fluidPage(theme = shinytheme("united"),
                                  choices = dd_year,
                                  selected = dd_year[1]),
                                #--download data
-                               downloadButton("downloadData_sals", "Download")
+                               downloadButton("downloadData_sals", "Download"),
+                               br(),
+                               h4("Red triangles are department heads")
                              ),
                              column(width = 9,
                                     plotlyOutput("fig_sals", height = "700px", width = "1200px"))
@@ -311,7 +315,7 @@ ui <- fluidPage(theme = shinytheme("united"),
 
 
                   #--start gender rep tab-
-                  tabPanel("Gender Makeup By Department",
+                  tabPanel("Gender Makeup",
                            fluidRow(
                              column(
                                width = 2,
@@ -320,7 +324,15 @@ ui <- fluidPage(theme = shinytheme("united"),
                                  "sel_college_gend",
                                  label = ("College:"),
                                  choices = c("All", dd_college),
-                                 selected = "All"),
+                                 selected = "All"
+                                 ),
+                               #--input, select dept to highlight
+                               selectInput(
+                                 "sel_dept_gend",
+                                 label = ("Dept to highlight:"),
+                                 choices = dd_dept,
+                                 selected = dd_dept[1]
+                                 ),
                                #--input, select year
                                selectInput(
                                  "sel_year_gend",
@@ -337,7 +349,7 @@ ui <- fluidPage(theme = shinytheme("united"),
                   #--end gender rep tab-
 
                   #--start stats tab-
-                  tabPanel("Statistics",
+                  tabPanel("Salary Statistics",
                            fluidRow(
                              column(
                                width = 2,
@@ -478,61 +490,6 @@ server <- function(input, output) {
             "-",
             input$sel_year_sals,
             ".csv")
-    },
-    content = function(file) {
-      write.csv(liq_sals(), file, row.names = FALSE)
-    }
-  )
-
-
-  #--college salary tab-------------------
-
-  liq_salsc <- reactive({
-    sals %>%
-      filter(
-        college2 == input$sel_college_salsc,
-        salary_type_nice == input$sel_saltype_salsc,
-        year == input$sel_year_salsc)
-  })
-
-  output$fig_salsc <- renderPlotly({
-
-    p1 <-
-      liq_salsc() %>%
-      ggplot(
-        aes(gender, amount, group = 1,
-            text = paste("Name:", name, "(", stringr::str_sub(gender, 1, 1), ")",
-                         "<br>Dept:",   dept, dept_chair2,
-                         "<br>Salary: $", round(amount / 1000, digits = 0), "thou"))
-      ) +
-      stat_summary(fun = mean, geom = "bar", aes(fill = gender), width = 0.9) +
-      geom_jitter(aes(color = dept_chair, pch = dept_chair), width = 0.2, size = 3, stroke = 1) +
-      guides(fill = F,
-             color = F,
-             pch = F) +
-      scale_y_continuous(labels = label_dollar()) +
-      scale_fill_manual(values = c("Female" = femalecolor, "Male" = malecolor)) +
-      scale_color_manual(values = c("N" = "black", "Y" = "red4")) +
-      scale_shape_manual(values = c(21, 17)) +
-      facet_grid(. ~ title_simp,
-                 scales = "free_y",
-                 switch = "y") +
-      mytheme +
-      theme(legend.position = "none") +
-      labs(x = NULL, y = NULL)
-
-    ggplotly(p1, tooltip = "text") %>% layout(margin = list(r = 200)) #--r = right
-
-
-  })
-
-  output$downloadData_salsc <- downloadHandler(
-    filename = function() {
-      paste0("ISUProfSals_",
-             clean_punc(input$sel_college_salsc),
-             "-",
-             input$sel_year_salsc,
-             ".csv")
     },
     content = function(file) {
       write.csv(liq_sals(), file, row.names = FALSE)
